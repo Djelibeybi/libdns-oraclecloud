@@ -40,21 +40,35 @@ const (
 //
 // The provider is safe for concurrent use.
 type Provider struct {
+	// Auth selects how the provider obtains OCI credentials: auto, api_key,
+	// config_file, environment, or instance_principal.
 	Auth string `json:"auth,omitempty"`
 
+	// ConfigFile is the path to the OCI config file, usually ~/.oci/config.
 	ConfigFile    string `json:"config_file,omitempty"`
+	// ConfigProfile is the profile name within ConfigFile to use.
 	ConfigProfile string `json:"config_profile,omitempty"`
 
+	// PrivateKey is the PEM-encoded API signing key content.
 	PrivateKey           string `json:"private_key,omitempty"`
+	// PrivateKeyPath is the path to the PEM-encoded API signing key file.
 	PrivateKeyPath       string `json:"private_key_path,omitempty"`
+	// PrivateKeyPassphrase is the passphrase for the API signing key, if any.
 	PrivateKeyPassphrase string `json:"private_key_passphrase,omitempty"`
+	// TenancyOCID is the OCID of the tenancy that owns the credentials.
 	TenancyOCID          string `json:"tenancy_ocid,omitempty"`
+	// UserOCID is the OCID of the OCI user for API key authentication.
 	UserOCID             string `json:"user_ocid,omitempty"`
+	// Fingerprint is the fingerprint of the registered OCI API signing key.
 	Fingerprint          string `json:"fingerprint,omitempty"`
+	// Region is the OCI region used for DNS API requests.
 	Region               string `json:"region,omitempty"`
 
+	// Scope selects the DNS zone scope: GLOBAL or PRIVATE.
 	Scope         string `json:"scope,omitempty"`
+	// ViewID identifies the private DNS view when operating on private zones by name.
 	ViewID        string `json:"view_id,omitempty"`
+	// CompartmentID identifies the compartment to search when listing zones.
 	CompartmentID string `json:"compartment_id,omitempty"`
 
 	mu        sync.Mutex `json:"-"`

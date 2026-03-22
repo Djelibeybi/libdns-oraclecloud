@@ -14,11 +14,18 @@ This package implements:
 
 ## Authentication
 
-The provider currently keeps OCI auth intentionally simple:
+OCI SDKs support several authentication methods. This provider supports the two
+primary methods: API keys, for authentication outside OCI, and
+`instance_principal`, for authentication from instances within OCI.
 
-- explicit API key fields on `oraclecloud.Provider`
-- OCI config file credentials
-- Oracle CLI environment variables
+All OCI SDKs support some or all of Oracle's standard environment variables for
+authentication configuration, so this provider does too.
+
+The recommended and most prominently documented configuration style is the
+standard OCI config file, usually `~/.oci/config`, because it matches Oracle's
+preferred user workflow and works cleanly with existing OCI tooling.
+
+See the OCI Developer Guide for more on the [Authentication Methods](https://docs.oracle.com/en-us/iaas/Content/API/Concepts/sdk_authentication_methods.htm) and [Environment Variables](https://docs.oracle.com/en-us/iaas/Content/API/SDKDocs/clienvironmentvariables.htm).
 
 Supported `Auth` values:
 
@@ -26,12 +33,18 @@ Supported `Auth` values:
 - `api_key`
 - `config_file`
 - `environment`
+- `instance_principal`
 
-`instance_principal` is also wired through, but the package is primarily aimed at API-key based usage for now.
+The `api_key`, `config_file`, and `environment` values are all API-key authentication;
+they only differ in where the credentials come from.
 
-If you use `Auth: "config_file"` with `ConfigFile: "~/.oci/config"`, you do not also need to provide
-`TenancyOCID`, `UserOCID`, `Fingerprint`, `Region`, or `PrivateKey*` fields. `ConfigProfile` is optional
-and defaults to `DEFAULT` (or `OCI_CLI_PROFILE` if set).
+`resource_principal` and token-based authentication are not currently supported.
+
+If you set `Auth` to `auto` or `config_file` with a valid `~/.oci/config` file available, or set `Auth` to `instance_principal` on an OCI instance with the appropriate policies applied, no further configuration is required to manage public DNS zones. However, both of these methods require `ViewID` to be configured to manage private zones by name.
+
+For `environment`, or when populating the provider fields directly, the minimum required values are `TenancyOCID`, `UserOCID`, `Fingerprint`, `Region`, and either `PrivateKeyPath` or inline `PrivateKey`. `PrivateKeyPassphrase` is only needed when the private key is passphrase-protected.
+
+`CompartmentID` is required to List Zones.
 
 ## Provider Fields
 
