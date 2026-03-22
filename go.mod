@@ -1,6 +1,6 @@
 module github.com/Djelibeybi/libdns-oraclecloud
 
-go 1.24.0
+go 1.25.0
 
 require (
 	github.com/libdns/libdns v1.1.1
