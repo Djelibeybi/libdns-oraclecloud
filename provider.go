@@ -1023,16 +1023,20 @@ func isOCID(value string) bool {
 }
 
 func recordRData(record libdns.Record) (string, error) {
-	switch value := record.(type) {
-	case libdns.TXT:
-		return strconv.Quote(value.Text), nil
-	default:
-		rr := record.RR()
-		if strings.TrimSpace(rr.Data) == "" {
-			return "", fmt.Errorf("record data is required for %q %s", rr.Name, rr.Type)
-		}
-		return rr.Data, nil
+	rr := record.RR()
+	if strings.TrimSpace(rr.Data) == "" {
+		return "", fmt.Errorf("record data is required for %q %s", rr.Name, rr.Type)
 	}
+
+	if strings.EqualFold(rr.Type, "TXT") {
+		text := rr.Data
+		if normalized, err := parseTXTRData(rr.Data); err == nil {
+			text = normalized
+		}
+		return strconv.Quote(text), nil
+	}
+
+	return rr.Data, nil
 }
 
 func parseTXTRData(input string) (string, error) {

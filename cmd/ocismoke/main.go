@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -17,30 +18,33 @@ import (
 
 func main() {
 	log.SetFlags(0)
+	if err := run(); err != nil {
+		log.Fatal(err)
+	}
+}
 
+func run() error {
 	var (
-		zone                 = flag.String("zone", "", "DNS zone name or OCI zone OCID (required)")
-		name                 = flag.String("name", "", "Relative TXT record name to create; defaults to a random _libdns-smoke-* label")
-		value                = flag.String("value", "", "TXT value to write; defaults to a generated smoke-test value")
-		ttl                  = flag.Duration("ttl", 30*time.Second, "TXT record TTL")
-		timeout              = flag.Duration("timeout", 2*time.Minute, "Overall timeout for the smoke test")
-		auth                 = flag.String("auth", "auto", "Provider auth mode: auto, config_file, environment, api_key")
-		configFile           = flag.String("config-file", "", "OCI config file path")
-		configProfile        = flag.String("config-profile", "", "OCI config profile name")
-		privateKey           = flag.String("private-key", "", "Inline OCI private key PEM")
-		privateKeyPath       = flag.String("private-key-path", "", "Path to OCI private key PEM")
-		privateKeyPassphrase = flag.String("private-key-passphrase", "", "OCI private key passphrase")
-		tenancyOCID          = flag.String("tenancy-ocid", "", "OCI tenancy OCID")
-		userOCID             = flag.String("user-ocid", "", "OCI user OCID")
-		fingerprint          = flag.String("fingerprint", "", "OCI API key fingerprint")
-		region               = flag.String("region", "", "OCI region")
-		scope                = flag.String("scope", "", "OCI DNS scope: GLOBAL or PRIVATE")
-		viewID               = flag.String("view-id", "", "OCI DNS view OCID; required for private zones by name")
+		zone           = flag.String("zone", "", "DNS zone name or OCI zone OCID (required)")
+		name           = flag.String("name", "", "Relative TXT record name to create; defaults to a random _libdns-smoke-* label")
+		value          = flag.String("value", "", "TXT value to write; defaults to a generated smoke-test value")
+		ttl            = flag.Duration("ttl", 30*time.Second, "TXT record TTL")
+		timeout        = flag.Duration("timeout", 2*time.Minute, "Overall timeout for the smoke test")
+		auth           = flag.String("auth", "auto", "Provider auth mode: auto, config_file, environment, api_key")
+		configFile     = flag.String("config-file", "", "OCI config file path")
+		configProfile  = flag.String("config-profile", "", "OCI config profile name")
+		privateKeyPath = flag.String("private-key-path", "", "Path to OCI private key PEM")
+		tenancyOCID    = flag.String("tenancy-ocid", "", "OCI tenancy OCID")
+		userOCID       = flag.String("user-ocid", "", "OCI user OCID")
+		fingerprint    = flag.String("fingerprint", "", "OCI API key fingerprint")
+		region         = flag.String("region", "", "OCI region")
+		scope          = flag.String("scope", "", "OCI DNS scope: GLOBAL or PRIVATE")
+		viewID         = flag.String("view-id", "", "OCI DNS view OCID; required for private zones by name")
 	)
 	flag.Parse()
 
 	if strings.TrimSpace(*zone) == "" {
-		log.Fatal("missing required -zone")
+		return fmt.Errorf("missing required -zone")
 	}
 
 	suffix := randomSuffix()
@@ -49,18 +53,24 @@ func main() {
 		recordName = "_libdns-smoke-" + suffix
 	}
 
-	txtValue := strings.TrimSpace(*value)
+	txtValue := *value
 	if txtValue == "" {
 		txtValue = "libdns-oraclecloud smoke test " + suffix
+	}
+
+	privateKey := strings.TrimSpace(os.Getenv("OCI_CLI_KEY_CONTENT"))
+	privateKeyPassphrase := strings.TrimSpace(os.Getenv("OCI_CLI_PASSPHRASE"))
+	if strings.EqualFold(strings.TrimSpace(*auth), "api_key") && strings.TrimSpace(*privateKeyPath) == "" && privateKey == "" {
+		return fmt.Errorf("api_key auth requires -private-key-path or OCI_CLI_KEY_CONTENT")
 	}
 
 	provider := &oraclecloud.Provider{
 		Auth:                 strings.TrimSpace(*auth),
 		ConfigFile:           strings.TrimSpace(*configFile),
 		ConfigProfile:        strings.TrimSpace(*configProfile),
-		PrivateKey:           strings.TrimSpace(*privateKey),
+		PrivateKey:           privateKey,
 		PrivateKeyPath:       strings.TrimSpace(*privateKeyPath),
-		PrivateKeyPassphrase: strings.TrimSpace(*privateKeyPassphrase),
+		PrivateKeyPassphrase: privateKeyPassphrase,
 		TenancyOCID:          strings.TrimSpace(*tenancyOCID),
 		UserOCID:             strings.TrimSpace(*userOCID),
 		Fingerprint:          strings.TrimSpace(*fingerprint),
@@ -84,45 +94,60 @@ func main() {
 
 	created, err := provider.AppendRecords(ctx, *zone, []libdns.Record{record})
 	if err != nil {
-		log.Fatalf("append TXT record: %v", err)
+		return fmt.Errorf("append TXT record: %w", err)
 	}
 	if len(created) == 0 {
-		log.Fatalf("append TXT record: provider returned no created records")
+		return fmt.Errorf("append TXT record: provider returned no created records")
 	}
+	cleanupNeeded := true
+	defer func() {
+		if !cleanupNeeded {
+			return
+		}
+
+		cleanupCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		if _, err := provider.DeleteRecords(cleanupCtx, *zone, created); err != nil {
+			log.Printf("Cleanup warning: delete TXT record %q: %v", record.Name, err)
+		}
+	}()
 
 	printRecords("Created", created)
 
 	log.Printf("Fetching records to confirm access and visibility")
 	records, err := provider.GetRecords(ctx, *zone)
 	if err != nil {
-		log.Fatalf("get records after append: %v", err)
+		return fmt.Errorf("get records after append: %w", err)
 	}
 
 	if !containsTXT(records, record.Name, txtValue) {
-		log.Fatalf("TXT record %q with expected value was not found after creation", record.Name)
+		return fmt.Errorf("TXT record %q with expected value was not found after creation", record.Name)
 	}
 	log.Printf("Confirmed TXT record is visible via GetRecords")
 
 	log.Printf("Deleting TXT record %q", record.Name)
 	deleted, err := provider.DeleteRecords(ctx, *zone, created)
 	if err != nil {
-		log.Fatalf("delete TXT record: %v", err)
+		return fmt.Errorf("delete TXT record: %w", err)
 	}
 	if len(deleted) == 0 {
-		log.Fatalf("delete TXT record: provider returned no deleted records")
+		return fmt.Errorf("delete TXT record: provider returned no deleted records")
 	}
 
 	printRecords("Deleted", deleted)
 
 	records, err = provider.GetRecords(ctx, *zone)
 	if err != nil {
-		log.Fatalf("get records after delete: %v", err)
+		return fmt.Errorf("get records after delete: %w", err)
 	}
 	if containsTXT(records, record.Name, txtValue) {
-		log.Fatalf("TXT record %q is still present after delete", record.Name)
+		return fmt.Errorf("TXT record %q is still present after delete", record.Name)
 	}
+	cleanupNeeded = false
 
 	log.Printf("Smoke test passed")
+	return nil
 }
 
 func printRecords(label string, records []libdns.Record) {

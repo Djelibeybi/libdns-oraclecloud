@@ -86,6 +86,10 @@ Useful flags:
 - `-name` to override the generated label
 - `-value` to override the generated TXT value
 
+For safety, the smoke-test command does not accept inline secret flags such as
+`--private-key` or `--private-key-passphrase`. Use `-config-file`, `-private-key-path`,
+or Oracle's `OCI_CLI_*` environment variables instead.
+
 ## Versioning
 
 This module follows Semantic Versioning, with Git tags like `v1.2.3`.

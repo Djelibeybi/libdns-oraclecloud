@@ -182,6 +182,21 @@ func TestRecordToDetailsQuotesTXTData(t *testing.T) {
 	}
 }
 
+func TestRecordToDetailsQuotesRawTXTRData(t *testing.T) {
+	details, err := recordToDetails(libdns.RR{
+		Name: "@",
+		TTL:  30 * time.Second,
+		Type: "TXT",
+		Data: "libdns oracle cloud",
+	}, "example.com.")
+	if err != nil {
+		t.Fatalf("recordToDetails() error = %v", err)
+	}
+	if got := value(details.Rdata); got != `"libdns oracle cloud"` {
+		t.Fatalf("recordToDetails() Rdata = %q, want %q", got, `"libdns oracle cloud"`)
+	}
+}
+
 func TestToLibdnsRecordParsesTXTRData(t *testing.T) {
 	record, err := toLibdnsRecord(testOCIRecord("smoke.example.com", "TXT", `"libdns-oraclecloud" " smoke"`, 30), "example.com.")
 	if err != nil {
