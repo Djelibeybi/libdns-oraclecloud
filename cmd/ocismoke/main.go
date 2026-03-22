@@ -8,11 +8,11 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
 	oraclecloud "github.com/Djelibeybi/libdns-oraclecloud"
+	"github.com/Djelibeybi/libdns-oraclecloud/internal/txtrdata"
 	"github.com/libdns/libdns"
 )
 
@@ -175,55 +175,8 @@ func txtMatchesValue(actual, expected string) bool {
 		return true
 	}
 
-	normalized, ok := parseTXTChunks(actual)
-	return ok && normalized == expected
-}
-
-func parseTXTChunks(input string) (string, bool) {
-	input = strings.TrimSpace(input)
-	if input == "" || !strings.Contains(input, "\"") {
-		return "", false
-	}
-
-	var out strings.Builder
-	for len(input) > 0 {
-		input = strings.TrimSpace(input)
-		if input == "" {
-			break
-		}
-		if input[0] != '"' {
-			return "", false
-		}
-
-		end := findQuotedChunkEnd(input)
-		if end <= 0 {
-			return "", false
-		}
-
-		part, err := strconv.Unquote(input[:end])
-		if err != nil {
-			return "", false
-		}
-		out.WriteString(part)
-		input = input[end:]
-	}
-
-	return out.String(), true
-}
-
-func findQuotedChunkEnd(input string) int {
-	escaped := false
-	for i := 1; i < len(input); i++ {
-		switch {
-		case escaped:
-			escaped = false
-		case input[i] == '\\':
-			escaped = true
-		case input[i] == '"':
-			return i + 1
-		}
-	}
-	return -1
+	normalized, err := txtrdata.Parse(actual)
+	return err == nil && normalized == expected
 }
 
 func randomSuffix() string {

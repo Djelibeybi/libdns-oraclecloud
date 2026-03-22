@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Djelibeybi/libdns-oraclecloud/internal/txtrdata"
 	"github.com/libdns/libdns"
 	"github.com/oracle/oci-go-sdk/v65/common"
 	ociauth "github.com/oracle/oci-go-sdk/v65/common/auth"
@@ -779,7 +780,7 @@ func toLibdnsRecord(record ocidns.Record, zone string) (libdns.Record, error) {
 
 	recordType := strings.ToUpper(*record.Rtype)
 	if recordType == "TXT" {
-		text, err := parseTXTRData(valueOrEmpty(record.Rdata))
+		text, err := txtrdata.Parse(valueOrEmpty(record.Rdata))
 		if err != nil {
 			return nil, err
 		}
@@ -1030,63 +1031,13 @@ func recordRData(record libdns.Record) (string, error) {
 
 	if strings.EqualFold(rr.Type, "TXT") {
 		text := rr.Data
-		if normalized, err := parseTXTRData(rr.Data); err == nil {
+		if normalized, err := txtrdata.Parse(rr.Data); err == nil {
 			text = normalized
 		}
 		return strconv.Quote(text), nil
 	}
 
 	return rr.Data, nil
-}
-
-func parseTXTRData(input string) (string, error) {
-	input = strings.TrimSpace(input)
-	if input == "" {
-		return "", nil
-	}
-	if !strings.Contains(input, "\"") {
-		return input, nil
-	}
-
-	var out strings.Builder
-	for len(input) > 0 {
-		input = strings.TrimSpace(input)
-		if input == "" {
-			break
-		}
-		if input[0] != '"' {
-			return "", fmt.Errorf("invalid TXT RDATA %q", input)
-		}
-
-		end := findQuotedChunkEnd(input)
-		if end <= 0 {
-			return "", fmt.Errorf("unterminated TXT chunk in %q", input)
-		}
-
-		part, err := strconv.Unquote(input[:end])
-		if err != nil {
-			return "", fmt.Errorf("unquoting TXT chunk %q: %w", input[:end], err)
-		}
-		out.WriteString(part)
-		input = input[end:]
-	}
-
-	return out.String(), nil
-}
-
-func findQuotedChunkEnd(input string) int {
-	escaped := false
-	for i := 1; i < len(input); i++ {
-		switch {
-		case escaped:
-			escaped = false
-		case input[i] == '\\':
-			escaped = true
-		case input[i] == '"':
-			return i + 1
-		}
-	}
-	return -1
 }
 
 func providerDataFromOCIRecord(record ocidns.Record) providerRecordData {
