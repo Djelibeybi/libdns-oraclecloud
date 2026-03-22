@@ -38,9 +38,9 @@ they only differ in where the credentials come from.
 
 `resource_principal` and token-based authentication are not currently supported.
 
-If you set `Auth` to `auto` or `config_file` with a valid `~.oci/config` file available or set `Auth` to `instance_principal` on a OCI instance with the appropriate policies applied, no further configuration is required to manage public DNS zones. However, both of these methods require `ViewID` to be configured to manage private zones by name.
+If you set `Auth` to `auto` or `config_file` with a valid `~/.oci/config` file available, or set `Auth` to `instance_principal` on an OCI instance with the appropriate policies applied, no further configuration is required to manage public DNS zones. However, both of these methods require `ViewID` to be configured to manage private zones by name.
 
-The minimum set of fields required for `environment` or when populating the provider fields directly are `TenancyOCID`, `UserOCID`, `Fingerprint`, `PrivateKeyPath`, `PrivateKeyPassphrase` (if applicable) and `Region`.
+For `environment`, or when populating the provider fields directly, the minimum required values are `TenancyOCID`, `UserOCID`, `Fingerprint`, `Region`, and either `PrivateKeyPath` or inline `PrivateKey`. `PrivateKeyPassphrase` is only needed when the private key is passphrase-protected.
 
 `CompartmentID` is required to List Zones.
 
