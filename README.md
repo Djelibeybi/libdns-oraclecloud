@@ -16,7 +16,7 @@ The provider currently keeps OCI auth intentionally simple:
 
 - explicit API key fields on `oraclecloud.Provider`
 - OCI config file credentials
-- OCI environment variables
+- Oracle CLI environment variables
 
 Supported `Auth` values:
 
@@ -26,6 +26,10 @@ Supported `Auth` values:
 - `environment`
 
 `instance_principal` is also wired through, but the package is primarily aimed at API-key based usage for now.
+
+If you use `Auth: "config_file"` with `ConfigFile: "~/.oci/config"`, you do not also need to provide
+`TenancyOCID`, `UserOCID`, `Fingerprint`, `Region`, or `PrivateKey*` fields. `ConfigProfile` is optional
+and defaults to `DEFAULT` (or `OCI_CLI_PROFILE` if set).
 
 ## Provider Fields
 
@@ -48,21 +52,36 @@ provider := oraclecloud.Provider{
 
 ## Environment Variables
 
-The provider accepts the same practical OCI API-key inputs commonly used by other Go DNS clients:
+The provider accepts Oracle's documented OCI CLI environment variables:
 
-- `OCI_PRIVATE_KEY` or `OCI_PRIVATE_KEY_PATH`
-- `OCI_PRIVATE_KEY_PASSWORD`
-- `OCI_TENANCY_OCID`
-- `OCI_USER_OCID`
-- `OCI_FINGERPRINT`
-- `OCI_REGION`
-- `OCI_CONFIG_FILE`
-- `OCI_CONFIG_PROFILE`
+- `OCI_CLI_KEY_CONTENT` or `OCI_CLI_KEY_FILE`
+- `OCI_CLI_PASSPHRASE`
+- `OCI_CLI_TENANCY`
+- `OCI_CLI_USER`
+- `OCI_CLI_FINGERPRINT`
+- `OCI_CLI_REGION`
+- `OCI_CLI_CONFIG_FILE`
+- `OCI_CLI_PROFILE`
 
-You can override the `OCI` prefix with `EnvironmentPrefix`.
+## Versioning
+
+This module follows Semantic Versioning, with Git tags like `v1.2.3`.
+
+For Go modules, that means:
+
+- `fix:` conventional commits map to patch releases
+- `feat:` conventional commits map to minor releases
+- `feat!:` or any commit with a `BREAKING CHANGE:` footer maps to a major release
+- if this module ever releases `v2+`, the Go module path must also change to include the major suffix
+  such as `github.com/Djelibeybi/libdns-oraclecloud/v2`
+
+GitHub Actions uses `release-please` to turn conventional commits merged to `main` into release PRs,
+SemVer tags, changelog updates, and GitHub Releases.
 
 ## Notes
 
+- In `Auth: "auto"` mode, explicit API-key fields take precedence over config-file auth. If you want to
+  force use of `~/.oci/config`, set `Auth: "config_file"`.
 - For private zones accessed by name, OCI requires `ViewID`.
 - `SetRecords` is atomic per RRSet because OCI exposes RRSet replacement as a single operation, but it is not atomic across multiple distinct RRSets.
 - The module path is `github.com/Djelibeybi/libdns-oraclecloud`.

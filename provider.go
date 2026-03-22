@@ -17,6 +17,18 @@ import (
 	ocidns "github.com/oracle/oci-go-sdk/v65/dns"
 )
 
+const (
+	envCLIProfile     = "OCI_CLI_PROFILE"
+	envCLIUser        = "OCI_CLI_USER"
+	envCLIRegion      = "OCI_CLI_REGION"
+	envCLIFingerprint = "OCI_CLI_FINGERPRINT"
+	envCLIKeyFile     = "OCI_CLI_KEY_FILE"
+	envCLIKeyContent  = "OCI_CLI_KEY_CONTENT"
+	envCLITenancy     = "OCI_CLI_TENANCY"
+	envCLIPassphrase  = "OCI_CLI_PASSPHRASE"
+	envCLIConfigFile  = "OCI_CLI_CONFIG_FILE"
+)
+
 // Provider facilitates DNS record manipulation with Oracle Cloud Infrastructure.
 //
 // Authentication is intentionally kept simple:
@@ -42,8 +54,6 @@ type Provider struct {
 	Scope         string `json:"scope,omitempty"`
 	ViewID        string `json:"view_id,omitempty"`
 	CompartmentID string `json:"compartment_id,omitempty"`
-
-	EnvironmentPrefix string `json:"environment_prefix,omitempty"`
 
 	mu        sync.Mutex `json:"-"`
 	client    dnsAPI     `json:"-"`
@@ -385,7 +395,7 @@ func (p *Provider) fileConfigurationProvider() (common.ConfigurationProvider, er
 
 	profile := strings.TrimSpace(p.ConfigProfile)
 	if profile == "" {
-		profile = envValue("OCI_CONFIG_PROFILE", "")
+		profile = envValue(envCLIProfile)
 	}
 	if profile == "" {
 		profile = "DEFAULT"
@@ -399,16 +409,14 @@ func (p *Provider) fileConfigurationProvider() (common.ConfigurationProvider, er
 }
 
 func (p *Provider) environmentConfigurationProvider() (common.ConfigurationProvider, error) {
-	prefix := p.envPrefix()
-
 	privateKey := strings.TrimSpace(p.PrivateKey)
 	if privateKey == "" {
-		privateKey = envValue(prefix+"_PRIVATE_KEY", prefix+"_private_key")
+		privateKey = envValue(envCLIKeyContent)
 	}
 	if privateKey == "" {
-		privateKeyPath := envValue(prefix+"_PRIVATE_KEY_PATH", prefix+"_private_key_path")
+		privateKeyPath := envValue(envCLIKeyFile)
 		if privateKeyPath == "" {
-			return nil, fmt.Errorf("%s_PRIVATE_KEY or %s_PRIVATE_KEY_PATH is required for environment authentication", prefix, prefix)
+			return nil, fmt.Errorf("%s or %s is required for environment authentication", envCLIKeyContent, envCLIKeyFile)
 		}
 		keyBytes, err := os.ReadFile(expandHome(privateKeyPath))
 		if err != nil {
@@ -419,16 +427,16 @@ func (p *Provider) environmentConfigurationProvider() (common.ConfigurationProvi
 
 	passphrase := strings.TrimSpace(p.PrivateKeyPassphrase)
 	if passphrase == "" {
-		passphrase = envValue(prefix+"_PRIVATE_KEY_PASSWORD", prefix+"_private_key_password")
+		passphrase = envValue(envCLIPassphrase)
 	}
 
-	tenancy := firstNonEmpty(strings.TrimSpace(p.TenancyOCID), envValue(prefix+"_TENANCY_OCID", prefix+"_tenancy_ocid"))
-	user := firstNonEmpty(strings.TrimSpace(p.UserOCID), envValue(prefix+"_USER_OCID", prefix+"_user_ocid"))
-	fingerprint := firstNonEmpty(strings.TrimSpace(p.Fingerprint), envValue(prefix+"_FINGERPRINT", prefix+"_fingerprint"))
-	region := firstNonEmpty(strings.TrimSpace(p.Region), envValue(prefix+"_REGION", prefix+"_region"))
+	tenancy := firstNonEmpty(strings.TrimSpace(p.TenancyOCID), envValue(envCLITenancy))
+	user := firstNonEmpty(strings.TrimSpace(p.UserOCID), envValue(envCLIUser))
+	fingerprint := firstNonEmpty(strings.TrimSpace(p.Fingerprint), envValue(envCLIFingerprint))
+	region := firstNonEmpty(strings.TrimSpace(p.Region), envValue(envCLIRegion))
 
 	if tenancy == "" || user == "" || fingerprint == "" || region == "" {
-		return nil, fmt.Errorf("%s_TENANCY_OCID, %s_USER_OCID, %s_FINGERPRINT, and %s_REGION are required for environment authentication", prefix, prefix, prefix, prefix)
+		return nil, fmt.Errorf("%s, %s, %s, and %s are required for environment authentication", envCLITenancy, envCLIUser, envCLIFingerprint, envCLIRegion)
 	}
 
 	var passphrasePtr *string
@@ -468,20 +476,12 @@ func (p *Provider) hasConfigFileHints() bool {
 }
 
 func (p *Provider) hasEnvironmentCredentials() bool {
-	prefix := p.envPrefix()
-	return envValue(prefix+"_TENANCY_OCID", prefix+"_tenancy_ocid") != "" ||
-		envValue(prefix+"_USER_OCID", prefix+"_user_ocid") != "" ||
-		envValue(prefix+"_FINGERPRINT", prefix+"_fingerprint") != "" ||
-		envValue(prefix+"_REGION", prefix+"_region") != "" ||
-		envValue(prefix+"_PRIVATE_KEY_PATH", prefix+"_private_key_path") != "" ||
-		envValue(prefix+"_PRIVATE_KEY", prefix+"_private_key") != ""
-}
-
-func (p *Provider) envPrefix() string {
-	if prefix := strings.TrimSpace(p.EnvironmentPrefix); prefix != "" {
-		return prefix
-	}
-	return "OCI"
+	return envValue(envCLITenancy) != "" ||
+		envValue(envCLIUser) != "" ||
+		envValue(envCLIFingerprint) != "" ||
+		envValue(envCLIRegion) != "" ||
+		envValue(envCLIKeyFile) != "" ||
+		envValue(envCLIKeyContent) != ""
 }
 
 func (p *Provider) resolveZone(ctx context.Context, client dnsAPI, zone string) (zoneRef, error) {
@@ -947,7 +947,7 @@ func normalizeZoneName(zone string) string {
 }
 
 func defaultConfigFilePath() string {
-	if value := strings.TrimSpace(os.Getenv("OCI_CONFIG_FILE")); value != "" {
+	if value := strings.TrimSpace(os.Getenv(envCLIConfigFile)); value != "" {
 		return expandHome(value)
 	}
 

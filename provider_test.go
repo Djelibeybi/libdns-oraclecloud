@@ -2,6 +2,7 @@ package oraclecloud
 
 import (
 	"context"
+	"os"
 	"testing"
 	"time"
 
@@ -167,6 +168,44 @@ func TestListZones(t *testing.T) {
 	}
 }
 
+func TestEnvironmentConfigurationProviderUsesOracleCLIVariables(t *testing.T) {
+	t.Setenv(envCLITenancy, "ocid1.tenancy.oc1..example")
+	t.Setenv(envCLIUser, "ocid1.user.oc1..example")
+	t.Setenv(envCLIFingerprint, "12:34:56:78")
+	t.Setenv(envCLIRegion, "us-phoenix-1")
+
+	keyFile, err := os.CreateTemp(t.TempDir(), "oci-key-*.pem")
+	if err != nil {
+		t.Fatalf("CreateTemp() error = %v", err)
+	}
+	if _, err := keyFile.WriteString(testPrivateKeyPEM); err != nil {
+		t.Fatalf("WriteString() error = %v", err)
+	}
+	if err := keyFile.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+	t.Setenv(envCLIKeyFile, keyFile.Name())
+
+	provider := &Provider{Auth: "environment"}
+	configProvider, err := provider.environmentConfigurationProvider()
+	if err != nil {
+		t.Fatalf("environmentConfigurationProvider() error = %v", err)
+	}
+
+	if got, err := configProvider.TenancyOCID(); err != nil || got != "ocid1.tenancy.oc1..example" {
+		t.Fatalf("TenancyOCID() = %q, %v", got, err)
+	}
+	if got, err := configProvider.UserOCID(); err != nil || got != "ocid1.user.oc1..example" {
+		t.Fatalf("UserOCID() = %q, %v", got, err)
+	}
+	if got, err := configProvider.KeyFingerprint(); err != nil || got != "12:34:56:78" {
+		t.Fatalf("KeyFingerprint() = %q, %v", got, err)
+	}
+	if got, err := configProvider.Region(); err != nil || got != "us-phoenix-1" {
+		t.Fatalf("Region() = %q, %v", got, err)
+	}
+}
+
 type fakeDNSClient struct {
 	zones       map[string]string
 	records     map[string][]ocidns.Record
@@ -316,3 +355,32 @@ func intValue(ptr *int) int {
 	}
 	return *ptr
 }
+
+const testPrivateKeyPEM = `-----BEGIN RSA PRIVATE KEY-----
+MIIEowIBAAKCAQEAx4j+5W8i2J6pcv6sQIZ4YxQfS6LzO0nmyK+dZ4k2nVqZKo84
+NLc5m9X9T5vWrl+ZlO/4AI1QkXl2WD1lkr8xSQ8K+WTixMz8CcpB3M17j0t1mHpy
+6s7E4t4FQaArl6Vt00ns7PZ7enYEgMq1lMcq89BI2v5k4VmbKFp5xYVbP0cO1gCt
+G6m+N2Qm3Y+bmNV6fpQFk5tFM0/s+QiPmpLqH4FuR5RqGZYxQywM66ieoBqM1w7c
+fn4iW2lTj5jS8kT9AwYFZW1W+ubz95V7RA5iW0m4N61efV0QebjEXF+WmKzCawhp
+otObKHa+7ixN5gQv8v2mukYjoX9iIwN90pce/QIDAQABAoIBADm9qXcnM3uSsh2+
+6JfA2eN0RaK0LAzqk6T8t2a1gTnT3P1He4pNnNwA22pkcQp7Dpqj7z2JiC+o9oGx
+ly6svYJOVkHR1x9hPw6qL7YFNoTK8hYboY9/zsJ+uNoeKxmI/r5k0d7lM9YtOWqI
+F2p2mDUMH6sd30h2C2fQBmL88v3iZ4zV6aJSMEf34Gq9l7J2pVmpL6BE5Rh4L6q8
+P0tUEQmCjg5YjFMi2dM8WeXQUBWmTSlF3Dc38C1bwlJ6BYm0KCw8lAQn0O69o8SL
+P6yx38aDg0Q3sYIG4Vx2BpW3SgX4O4ayk7Wq8Ww9V3fYQw1Q4a2UBtm7z3ZlrjlG
+dz3fMGECgYEA8Mrl0eMOG0Y1a7z7m2rx4XlsZqW4a7HkT3On8mK2yDI+IAXm9y8n
+0bz2fE+JEE+ahbAdnD6mX3TY8J9OFrjFrw0kOj7fM6Y3w8Bh7JOii0v9cewT0WZz
+L4AZ2A4sAgRu46A34l1hIe8w/1oCAlPckjNzM0NdpxgqA8isYy1hlM0CgYEA0piQ
+9a7pFT8K2+8e1TJjGvXz5+ltF6Dn1vvGrf7v+AB9TFn/fx8KoRPr1A7v4fmjTEmP
+kM8Mz0h5jDgFQ9v7IP0r3Pv2i6k1xF7c4s4X8Sdrh3fe85Hsn9PTVY3S4mNXM7h4
+kkK+7iBpt1vu3iBDvVYQ4HMLr3pt0e0ct4BGv/ECgYEApTxj0Ik3YIvd2I1B5j7e
+7nzNhE8P+6H/zNMLU3A4L5otXGbkZt8QAPJxhWg5t8Ce3HGVBNk1FE5Vn9I9Y8bc
+0t4DClxCHuRNDM6Q6A1l1ZfF2ckvKSK7w0u3GJskZ/KSBw4GmJr6FJ6ruQ3jTch1
+uZ64v7dE/2I5qk0ryVQW9sUCgYA7KaKKqlKhGqjP6feD3M35/OMH1g8LyP1FUAv7
+zsH/0nF0QzT4QiWzk2I+4Z4T8JqYOdY6X1qFnDFg99EdpK2gWsArwSeVj9lF1pWl
+sn9K0+RzR9n6ylTn5J4Xl2tJrJw6hWgPrsjMnYVTTFp1hSSUDPG5xP9dBiO2STMd
+VJ3PwQKBgBRb4Yh3iR2oOrk9c1q4c6kX3xKhTQq3CRJqjSxKs8SL4e4wHuM4OWKr
+O3tzzbjYV7eJ1u2Z6BZ7dBn1M4l9MZl8AfM5Rm5s8shGwSyvZbIjO+Pk4ecf/8gk
+dnIHT7xjMFLhNu/cF9MqT7SCcaGX+XlTpDkOSsLyeN+StT4eoHh3
+-----END RSA PRIVATE KEY-----
+`
